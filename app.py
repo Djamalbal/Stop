@@ -38,6 +38,9 @@ Restez connectés, on revient très vite avec la fonctionnalité YouTube et bien
 # Message court pour les messages suivants
 response_during_maintenance = "🔧 Le bot est en pause pour l'implémentation de la fonctionnalité YouTube. Il sera de retour dans environ 12 heures."
 
+# Message pour le bouton (doit être court, moins de 640 caractères)
+button_message = "Si vous avez des questions pendant la maintenance, vous pouvez me contacter directement :"
+
 # Bouton "Contactez-moi"
 contact_button = [{
     "type": "web_url",
@@ -79,9 +82,15 @@ def webhook():
                 if "message" in messaging_event:
                     # Vérifier si l'utilisateur a déjà reçu le message complet
                     if sender_id not in users_notified:
-                        # Première fois - envoyer le message complet avec le bouton
+                        # Première fois - envoyer le message complet puis le bouton séparément
                         logger.info(f"Sending full maintenance message to new user {sender_id}")
-                        send_message(sender_id, maintenance_message, contact_button)
+                        
+                        # D'abord envoyer le message texte complet
+                        send_message(sender_id, maintenance_message)
+                        
+                        # Puis envoyer le bouton séparément
+                        send_message(sender_id, button_message, contact_button)
+                        
                         users_notified[sender_id] = True
                     else:
                         # Messages suivants - envoyer le message court
@@ -155,6 +164,7 @@ def status():
         "status": "online",
         "maintenance_mode": True,
         "users_notified": len(users_notified),
+        "users_list": list(users_notified.keys()),
         "verify_token": VERIFY_TOKEN[:3] + "***" if VERIFY_TOKEN else "Non configuré",
         "page_token": PAGE_ACCESS_TOKEN[:5] + "***" if PAGE_ACCESS_TOKEN else "Non configuré"
     }), 200
