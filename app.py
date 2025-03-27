@@ -156,7 +156,7 @@ def trigger_broadcast():
             for conversation in data["data"]:
                 if "participants" in conversation and "data" in conversation["participants"]:
                     for participant in conversation["participants"]["data"]:
-                        if participant.get("id") and participant.get("id") != "PAGE_ID":  # Remplacer PAGE_ID par l'ID de votre page
+                        if participant.get("id") and participant.get("id") != "61573963893697":  # Remplacer PAGE_ID par l'ID de votre page
                             user_ids.append(participant["id"])
         
         # Éliminer les doublons
