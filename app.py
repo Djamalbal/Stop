@@ -15,7 +15,11 @@ app = Flask(__name__)
 PAGE_ACCESS_TOKEN = os.environ.get('PAGE_ACCESS_TOKEN')
 VERIFY_TOKEN = os.environ.get('VERIFY_TOKEN', 'denja19')  # Utilisation de 'denja19' comme valeur par défaut
 
-# Message de maintenance
+# Dictionnaire pour suivre les utilisateurs qui ont déjà reçu le message de maintenance
+# Clé: user_id, Valeur: True si le message complet a déjà été envoyé
+users_notified = {}
+
+# Message de maintenance complet (envoyé la première fois)
 maintenance_message = """🚨 Mise à jour importante ! 🚨
 
 Salut à tous ! C'est Djamaldine, et je voulais vous prévenir d'un petit changement concernant le bot !
@@ -31,7 +35,7 @@ Cela nous permettra de finaliser les ajustements nécessaires et de vous offrir 
 
 Restez connectés, on revient très vite avec la fonctionnalité YouTube et bien plus ! 🚀."""
 
-# Message de réponse pendant la maintenance
+# Message court pour les messages suivants
 response_during_maintenance = "🔧 Le bot est en pause pour l'implémentation de la fonctionnalité YouTube. Il sera de retour dans environ 12 heures."
 
 # Bouton "Contactez-moi"
@@ -73,10 +77,16 @@ def webhook():
                 
                 # Si un message est reçu pendant la maintenance
                 if "message" in messaging_event:
-                    logger.info(f"Sending maintenance response to user {sender_id}")
-                    
-                    # Envoyer le message de maintenance avec le bouton de contact
-                    send_message(sender_id, response_during_maintenance, contact_button)
+                    # Vérifier si l'utilisateur a déjà reçu le message complet
+                    if sender_id not in users_notified:
+                        # Première fois - envoyer le message complet avec le bouton
+                        logger.info(f"Sending full maintenance message to new user {sender_id}")
+                        send_message(sender_id, maintenance_message, contact_button)
+                        users_notified[sender_id] = True
+                    else:
+                        # Messages suivants - envoyer le message court
+                        logger.info(f"Sending short maintenance response to returning user {sender_id}")
+                        send_message(sender_id, response_during_maintenance)
                     
     return "ok", 200
 
@@ -136,95 +146,31 @@ def send_message(recipient_id, message_text, buttons=None):
         logger.error(f"Exception lors de l'envoi du message à {recipient_id}: {str(e)}")
         return False
 
-@app.route('/broadcast', methods=['GET'])
-def trigger_broadcast():
-    """
-    Endpoint pour déclencher l'envoi du message de maintenance
-    Cette version utilise l'API de Conversation pour trouver les utilisateurs récents
-    """
-    if not PAGE_ACCESS_TOKEN:
-        return "PAGE_ACCESS_TOKEN non configuré", 500
-    
-    try:
-        # Utiliser l'API Sponsored Messages pour envoyer un message à tous les utilisateurs
-        # Cette méthode nécessite une approbation spéciale de Facebook et un budget publicitaire
-        # C'est la seule façon officielle d'envoyer des messages en dehors de la fenêtre de 24h
-        
-        logger.info("Tentative d'envoi du message de maintenance via l'API de conversation")
-        
-        # Récupérer les conversations récentes (dernières 24h)
-        params = {
-            "access_token": PAGE_ACCESS_TOKEN,
-            "fields": "participants",
-            "limit": 50  # Limiter à 50 conversations pour éviter les problèmes de rate limiting
-        }
-        
-        response = requests.get(
-            "https://graph.facebook.com/v17.0/me/conversations",
-            params=params
-        )
-        
-        if response.status_code != 200:
-            logger.error(f"Erreur lors de la récupération des conversations: {response.text}")
-            return jsonify({
-                "success": False,
-                "error": f"Erreur lors de la récupération des conversations: {response.text}"
-            }), 500
-        
-        data = response.json()
-        user_ids = []
-        success_count = 0
-        error_count = 0
-        
-        # Extraire les IDs des utilisateurs
-        if "data" in data:
-            for conversation in data["data"]:
-                if "participants" in conversation and "data" in conversation["participants"]:
-                    for participant in conversation["participants"]["data"]:
-                        if participant.get("id") and "PSID" in participant.get("id", ""):
-                            user_id = participant["id"]
-                            user_ids.append(user_id)
-        
-        # Éliminer les doublons
-        user_ids = list(set(user_ids))
-        logger.info(f"Nombre d'utilisateurs trouvés: {len(user_ids)}")
-        
-        # Envoyer le message à chaque utilisateur
-        for user_id in user_ids:
-            success = send_message(user_id, maintenance_message, contact_button)
-            if success:
-                success_count += 1
-            else:
-                error_count += 1
-        
-        # Si aucun utilisateur n'a été trouvé, proposer une solution alternative
-        if len(user_ids) == 0:
-            return jsonify({
-                "success": False,
-                "message": "Aucun utilisateur récent trouvé. Pour envoyer des messages en dehors de la fenêtre de 24h, vous devez utiliser les Sponsored Messages ou les Message Tags approuvés par Facebook."
-            }), 200
-        
-        return jsonify({
-            "success": True,
-            "message": f"Message de maintenance envoyé à {success_count} utilisateurs sur {len(user_ids)} tentatives. {error_count} erreurs."
-        }), 200
-    
-    except Exception as e:
-        logger.error(f"Erreur lors de l'envoi du broadcast: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
 @app.route('/status', methods=['GET'])
 def status():
     """
-    Endpoint pour vérifier le statut du bot
+    Endpoint pour vérifier le statut du bot et voir les statistiques
     """
     return jsonify({
         "status": "online",
+        "maintenance_mode": True,
+        "users_notified": len(users_notified),
         "verify_token": VERIFY_TOKEN[:3] + "***" if VERIFY_TOKEN else "Non configuré",
         "page_token": PAGE_ACCESS_TOKEN[:5] + "***" if PAGE_ACCESS_TOKEN else "Non configuré"
+    }), 200
+
+@app.route('/reset', methods=['GET'])
+def reset_users():
+    """
+    Endpoint pour réinitialiser la liste des utilisateurs notifiés
+    Utile si vous voulez renvoyer le message complet à tous les utilisateurs
+    """
+    global users_notified
+    count = len(users_notified)
+    users_notified = {}
+    return jsonify({
+        "success": True,
+        "message": f"Liste des {count} utilisateurs notifiés réinitialisée"
     }), 200
 
 if __name__ == "__main__":
