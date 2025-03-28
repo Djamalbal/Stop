@@ -20,23 +20,18 @@ VERIFY_TOKEN = os.environ.get('VERIFY_TOKEN', 'denja19')  # Utilisation de 'denj
 users_notified = {}
 
 # Message de maintenance complet (envoyé la première fois)
-maintenance_message = """🚨 Mise à jour importante ! 🚨
+maintenance_message = """🔴 Annonce Importante 🔴
 
-Salut à tous ! C'est Djamaldine, et je voulais vous prévenir d'un petit changement concernant le bot !
+Le bot sera mis en pause pour une durée indéterminée en raison d'une mise à jour majeure et d'un problème technique sur le serveur. ⏳⚙️
 
-⚙️ Le bot sera mis en pause pendant 12 heures pour l'implantation de la nouvelle fonctionnalité YouTube.
-Cela nous permettra de finaliser les ajustements nécessaires et de vous offrir une meilleure expérience avec YouTube ! 📹
-
-⏳ Durée de la pause : 12 heures
-🔧 Pendant ce temps, le bot ne sera pas accessible, mais ne vous inquiétez pas, il reviendra avec de nouvelles améliorations très bientôt !
-
-🙏 Merci pour votre patience et compréhension !
-👉 Pour toute question, vous pouvez me contacter sur Facebook.
-
-Restez connectés, on revient très vite avec la fonctionnalité YouTube et bien plus ! 🚀."""
+Nous travaillons activement pour rétablir le service dès que possible. Merci de votre patience et de votre compréhension. 🙏"""
 
 # Message court pour les messages suivants
-response_during_maintenance = "🔧 Le bot est en pause pour l'implémentation de la fonctionnalité YouTube. Il sera de retour dans environ 12 heures."
+response_during_maintenance = """⚠️ Bot en maintenance ⚠️
+
+Le bot est actuellement en pause pour une mise à jour et un problème technique sur le serveur. ⏳
+
+Merci de patienter jusqu'à son retour. 🙏"""
 
 # Message pour le bouton (doit être court, moins de 640 caractères)
 button_message = "Si vous avez des questions pendant la maintenance, vous pouvez me contacter directement :"
@@ -93,9 +88,14 @@ def webhook():
                         
                         users_notified[sender_id] = True
                     else:
-                        # Messages suivants - envoyer le message court
+                        # Messages suivants - envoyer le message court avec le bouton
                         logger.info(f"Sending short maintenance response to returning user {sender_id}")
+                        
+                        # Envoyer le message court
                         send_message(sender_id, response_during_maintenance)
+                        
+                        # Puis envoyer le bouton
+                        send_message(sender_id, button_message, contact_button)
                     
     return "ok", 200
 
